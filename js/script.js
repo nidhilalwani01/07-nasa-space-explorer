@@ -41,6 +41,7 @@ const favoritesStorageKey = 'apodFavorites';
 const themeStorageKey = 'themePreference';
 const maxCustomRangeDays = 60;
 const drawerAnimationMs = 220;
+const signalLockDelayMs = 340;
 const debugMode = false;
 
 let currentGalleryItems = [];
@@ -91,8 +92,130 @@ function showGalleryMessage(message) {
   `;
 }
 
-function updateRangeSummary(message) {
-  rangeSummary.textContent = message;
+function updateRangeSummary(message, status = 'info') {
+  const normalizedStatus = ['idle', 'info', 'loading', 'success', 'warning', 'error'].includes(status)
+    ? status
+    : 'info';
+
+  const statusLabels = {
+    idle: 'Standby',
+    info: 'Status',
+    loading: 'Scanning',
+    success: 'Locked',
+    warning: 'Check',
+    error: 'Error'
+  };
+
+  rangeSummary.classList.remove(
+    'status-idle',
+    'status-info',
+    'status-loading',
+    'status-success',
+    'status-warning',
+    'status-error'
+  );
+
+  rangeSummary.classList.add(`status-${normalizedStatus}`);
+
+  const chip = document.createElement('span');
+  chip.className = 'status-chip';
+  chip.textContent = statusLabels[normalizedStatus];
+
+  const statusMessage = document.createElement('span');
+  statusMessage.className = 'status-message';
+  statusMessage.textContent = message;
+
+  rangeSummary.replaceChildren(chip, statusMessage);
+}
+
+async function playMissionStatusMoment(message, delayMs = signalLockDelayMs) {
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  updateRangeSummary(message, 'success');
+
+  if (prefersReducedMotion) {
+    return;
+  }
+
+  rangeSummary.classList.remove('signal-lock');
+  void rangeSummary.offsetWidth;
+  rangeSummary.classList.add('signal-lock');
+
+  await new Promise((resolve) => {
+    window.setTimeout(() => {
+      rangeSummary.classList.remove('signal-lock');
+      resolve();
+    }, delayMs);
+  });
+}
+
+function setupSectionReveal() {
+  const revealTargets = document.querySelectorAll(
+    '.site-header, .preset-panel, .filters-kicker, .filters, .range-summary, .featured-apod, .space-fact, .gallery-kicker'
+  );
+
+  if (revealTargets.length === 0) {
+    return;
+  }
+
+  revealTargets.forEach((element, index) => {
+    element.classList.add('section-reveal');
+    element.style.setProperty('--reveal-delay', `${Math.min(index, 8) * 35}ms`);
+  });
+
+  if (!('IntersectionObserver' in window)) {
+    revealTargets.forEach((element) => element.classList.add('is-visible'));
+    return;
+  }
+
+  const revealObserver = new IntersectionObserver((entries, observer) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) {
+        return;
+      }
+
+      entry.target.classList.add('is-visible');
+      observer.unobserve(entry.target);
+    });
+  }, {
+    root: null,
+    threshold: 0.16,
+    rootMargin: '0px 0px -6% 0px'
+  });
+
+  revealTargets.forEach((element) => revealObserver.observe(element));
+}
+
+function setupGalleryReveal() {
+  const galleryItems = gallery.querySelectorAll('.gallery-item.reveal-item');
+
+  if (galleryItems.length === 0) {
+    return;
+  }
+
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (prefersReducedMotion || !('IntersectionObserver' in window)) {
+    galleryItems.forEach((item) => item.classList.add('is-visible'));
+    return;
+  }
+
+  const galleryRevealObserver = new IntersectionObserver((entries, observer) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) {
+        return;
+      }
+
+      entry.target.classList.add('is-visible');
+      observer.unobserve(entry.target);
+    });
+  }, {
+    root: null,
+    threshold: 0.14,
+    rootMargin: '0px 0px -8% 0px'
+  });
+
+  galleryItems.forEach((item) => galleryRevealObserver.observe(item));
 }
 
 function showRandomSpaceFact() {
@@ -549,7 +672,16 @@ function renderFeaturedApod(item) {
   currentFeaturedItem = item;
   const featuredImage = item.hdurl || item.url;
 
-  featuredMedia.innerHTML = `<img src="${featuredImage}" alt="${item.title}" />`;
+  featuredMedia.innerHTML = `
+    <div class="featured-media-frame">
+      <img src="${featuredImage}" alt="${item.title}" />
+      <div class="media-caption featured-media-caption" aria-hidden="true">
+        <p class="media-caption-title">${item.title}</p>
+        <p class="media-caption-date">${formatDisplayDate(item.date)}</p>
+      </div>
+      <span class="featured-media-overlay" aria-hidden="true"></span>
+    </div>
+  `;
   featuredTitle.textContent = item.title;
   featuredDate.textContent = formatDisplayDate(item.date);
   featuredDescription.textContent = createDescriptionPreview(item.explanation);
@@ -591,9 +723,14 @@ function createGalleryMarkup(apodItems) {
 
       return `
         <article class="gallery-item reveal-item" data-index="${index}" role="button" tabindex="0" style="--stagger:${Math.min(index, 8) * 45}ms">
-          <img src="${cardImage}" alt="${item.title}" />
-          <p class="gallery-title">${item.title}${mediaLabel}</p>
-          <p class="gallery-date">${formatDisplayDate(item.date)}</p>
+          <div class="gallery-media-frame">
+            <img src="${cardImage}" alt="${item.title}" />
+            <div class="media-caption gallery-media-caption" aria-hidden="true">
+              <p class="media-caption-title">${item.title}${mediaLabel}</p>
+              <p class="media-caption-date">${formatDisplayDate(item.date)}</p>
+            </div>
+            <span class="gallery-media-overlay" aria-hidden="true"></span>
+          </div>
           <p class="gallery-excerpt">${excerpt}</p>
           <div class="gallery-actions">
             <button class="favorite-button button-secondary${isSaved ? ' is-favorite' : ''}" type="button" data-date="${item.date}" aria-pressed="${isSaved}">${createFavoriteButtonText(isSaved)}</button>
@@ -723,7 +860,7 @@ async function handleGetImagesClick() {
 
   if (!startDate || !endDate) {
     showGalleryMessage('Please choose a start date and end date first.');
-    updateRangeSummary('Please select both dates to load APOD results.');
+    updateRangeSummary('Please select both dates to load APOD results.', 'warning');
     return;
   }
 
@@ -731,14 +868,15 @@ async function handleGetImagesClick() {
 
   if (selectedDayCount > maxCustomRangeDays && activePreset !== 'bestOfYear') {
     showGalleryMessage(`Please choose a smaller range (up to ${maxCustomRangeDays} days) for faster loading.`);
-    updateRangeSummary(`Selected range is ${selectedDayCount} days. Try ${maxCustomRangeDays} days or fewer.`);
+    updateRangeSummary(`Selected range is ${selectedDayCount} days. Try ${maxCustomRangeDays} days or fewer.`, 'warning');
     return;
   }
 
   setLoadingState(true);
   showLoadingSkeletons();
-  updateRangeSummary(`Loading ${presetLabels[activePreset] || 'selected'} range...`);
+  updateRangeSummary(`Loading ${presetLabels[activePreset] || 'selected'} range...`, 'loading');
 
+  const requestStartedAt = performance.now();
   const requestUrl = `${nasaApiBaseUrl}?api_key=${apiKey}&start_date=${startDate}&end_date=${endDate}&thumbs=true`;
 
   try {
@@ -762,7 +900,7 @@ async function handleGetImagesClick() {
       currentGalleryItems = [];
       hideFeaturedApod();
       showGalleryMessage('No APOD results were found for this date range.');
-      updateRangeSummary('No APOD items found for this range. Try a different preset or different dates.');
+      updateRangeSummary('No APOD items found for this range. Try a different preset or different dates.', 'warning');
       return;
     }
 
@@ -772,16 +910,22 @@ async function handleGetImagesClick() {
 
     if (galleryItems.length === 0) {
       showGalleryMessage('The featured APOD is shown above. Try a wider date range to see more cards.');
-      updateRangeSummary(`Showing 1 featured item for ${presetLabels[activePreset] || 'Selected range'}.`);
+      updateRangeSummary(`Showing 1 featured item for ${presetLabels[activePreset] || 'Selected range'}.`, 'success');
       syncFavoriteButtons();
       return;
     }
 
+    const fetchElapsedMs = performance.now() - requestStartedAt;
+    const missionDelayMs = fetchElapsedMs > 1200 ? 180 : signalLockDelayMs;
+
+    await playMissionStatusMoment(`Signal lock acquired. Preparing ${galleryItems.length} transmissions...`, missionDelayMs);
+
     gallery.innerHTML = createGalleryMarkup(galleryItems);
+    setupGalleryReveal();
     syncFavoriteButtons();
 
     const rangeLabel = presetLabels[activePreset] || 'Selected range';
-    updateRangeSummary(`Showing ${preparedItems.length} items for ${rangeLabel}: ${formatDisplayDate(startDate)} to ${formatDisplayDate(endDate)}.`);
+    updateRangeSummary(`Transmission received: ${preparedItems.length} items for ${rangeLabel}, ${formatDisplayDate(startDate)} to ${formatDisplayDate(endDate)}.`, 'success');
   } catch (error) {
     console.error('NASA APOD fetch error:', error);
     currentGalleryItems = [];
@@ -789,13 +933,13 @@ async function handleGetImagesClick() {
 
     if (error.status === 429) {
       showGalleryMessage('NASA API rate limit reached for your API key. Please wait a bit and try again.');
-      updateRangeSummary('Too many requests right now. Please wait and try again.');
+      updateRangeSummary('Too many requests right now. Please wait and try again.', 'warning');
     } else if (error.status >= 500) {
       showGalleryMessage('NASA APOD service is temporarily unavailable (server error). Please try again soon.');
-      updateRangeSummary('NASA APOD is temporarily unavailable.');
+      updateRangeSummary('NASA APOD is temporarily unavailable.', 'error');
     } else {
       showGalleryMessage('Sorry, we could not load NASA images right now. Please try again.');
-      updateRangeSummary('Could not load APOD data for this range.');
+      updateRangeSummary('Could not load APOD data for this range.', 'error');
     }
   } finally {
     setLoadingState(false);
@@ -815,7 +959,7 @@ startInput.addEventListener('change', () => {
     setActivePreset('');
   }
 
-  updateRangeSummary('Manual date range selected. Click "Get Space Images" when ready.');
+  updateRangeSummary('Manual date range selected. Click "Get Space Images" when ready.', 'info');
 });
 
 endInput.addEventListener('change', () => {
@@ -823,7 +967,7 @@ endInput.addEventListener('change', () => {
     setActivePreset('');
   }
 
-  updateRangeSummary('Manual date range selected. Click "Get Space Images" when ready.');
+  updateRangeSummary('Manual date range selected. Click "Get Space Images" when ready.', 'info');
 });
 
 featuredOpenButton.addEventListener('click', () => {
@@ -955,5 +1099,6 @@ showRandomSpaceFact();
 favoriteItems = loadFavorites();
 renderFavoritesDrawer();
 setActivePreset('last7');
-updateRangeSummary('Start with a preset, or pick dates manually below.');
+updateRangeSummary('Start with a preset, or pick dates manually below.', 'idle');
+setupSectionReveal();
 applyPreset('last7', false);

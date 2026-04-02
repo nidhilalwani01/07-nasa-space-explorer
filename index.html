@@ -19,6 +19,7 @@
     </header>
 
     <section class="preset-panel" aria-label="Quick date presets">
+      <p class="section-kicker">Mission Control</p>
       <h2 class="preset-title">Quick Ranges</h2>
       <div class="preset-buttons" role="group" aria-label="Date range presets">
         <button class="preset-button" data-preset="last7" type="button" aria-pressed="true">Last 7 Days</button>
@@ -29,6 +30,7 @@
       <p class="preset-hint">Choose a quick range, or pick dates manually below.</p>
     </section>
 
+    <p class="section-kicker filters-kicker">Archive Window</p>
     <div class="filters">
       <input type="date" id="startDate" />
       <input type="date" id="endDate" />
@@ -37,13 +39,13 @@
 
     <p id="rangeSummary" class="range-summary" aria-live="polite"></p>
 
-    <section id="featuredApod" class="featured-apod hidden" aria-label="Featured APOD">
-      <p class="featured-label">Featured APOD</p>
+    <section id="featuredApod" class="featured-apod hidden" aria-label="Featured Transmission">
+      <p class="featured-label">Featured Transmission</p>
       <div class="featured-layout">
         <div id="featuredMedia" class="featured-media"></div>
         <div class="featured-content">
-          <h2 id="featuredTitle"></h2>
-          <p id="featuredDate" class="featured-date"></p>
+          <h2 id="featuredTitle" class="sr-only"></h2>
+          <p id="featuredDate" class="featured-date sr-only"></p>
           <p id="featuredDescription" class="featured-description"></p>
           <div class="featured-actions">
             <button id="featuredOpenButton" class="featured-open button-primary" type="button">Read Full Details</button>
@@ -54,10 +56,12 @@
     </section>
 
     <section class="space-fact" aria-live="polite">
+      <p class="section-kicker">Daily Transmission</p>
       <h2>Did You Know?</h2>
       <p id="spaceFactText"></p>
     </section>
 
+    <p class="section-kicker gallery-kicker">Deep Space Archive</p>
     <div id="gallery" class="gallery">
       <div class="placeholder">
         <div class="placeholder-icon">🔭</div>
