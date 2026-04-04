@@ -608,7 +608,7 @@ function showLoadingSkeletons() {
   delete featuredFavoriteButton.dataset.date;
 
   gallery.innerHTML = Array.from({ length: 3 }, (_, index) => `
-    <article class="gallery-item skeleton-card" style="--stagger:${index * 45}ms">
+    <article class="gallery-item skeleton-card" style="--stagger:${Math.min(index, 10) * 58}ms">
       <div class="skeleton-block skeleton-card-media"></div>
       <span class="skeleton-line skeleton-title"></span>
       <span class="skeleton-line skeleton-date"></span>
@@ -722,10 +722,11 @@ function createGalleryMarkup(apodItems) {
         : '';
 
       return `
-        <article class="gallery-item reveal-item" data-index="${index}" role="button" tabindex="0" style="--stagger:${Math.min(index, 8) * 45}ms">
+        <article class="gallery-item reveal-item" data-index="${index}" data-media-type="${item.media_type}" role="button" tabindex="0" style="--stagger:${Math.min(index, 10) * 58}ms">
           <div class="gallery-media-frame">
             <img src="${cardImage}" alt="${item.title}" />
             <div class="media-caption gallery-media-caption" aria-hidden="true">
+              <p class="gallery-media-tag">${item.media_type === 'video' ? 'Video Transmission' : 'Image Transmission'}</p>
               <p class="media-caption-title">${item.title}${mediaLabel}</p>
               <p class="media-caption-date">${formatDisplayDate(item.date)}</p>
             </div>
